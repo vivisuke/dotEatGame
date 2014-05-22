@@ -24,13 +24,37 @@ typedef unsigned char byte;
 #define		DBL_BUFFER		1
 
 typedef std::pair<int, int> Vec2;		//	(x, y) ベクター
+bool operator==(const Vec2 &a, const Vec2 &b)
+{
+	return a.first == b.first && a.second == b.second;
+}
+Vec2 operator+(const Vec2 &a, const Vec2 &b)
+{
+	return Vec2(a.first + b.first, a.second + b.second);
+}
+Vec2 operator-(const Vec2 &a, const Vec2 &b)
+{
+	return Vec2(a.first - b.first, a.second - b.second);
+}
+//	x' 	(cosθ - sinθ)  x
+//	y'	(sinθ + cosθ) y
+Vec2 rot_right90(const Vec2 v)
+{
+	return Vec2(-v.second, v.first);
+}
+Vec2 rot_left90(const Vec2 v)
+{
+	return Vec2(v.second, -v.first);
+}
 
 //----------------------------------------------------------------------
 struct Car
 {
 public:
 	Car(int x = 0, int y = 0, int dx = 0, int dy = 0, int lane = 0)
-		: m_x(x), m_y(y), m_dx(dx), m_dy(dy), m_lane(lane)
+		: m_pos(x, y), m_v(dx, dy)
+		//: m_x(x), m_y(y), m_dx(dx), m_dy(dy)
+		, m_lane(lane)
 		, m_laneChanged(false)
 		{}
 	//Car(const Car &x)
@@ -38,10 +62,15 @@ public:
 	//	, m_laneChanged(false)
 	//	{}
 public:
+#if	1
+	Vec2	m_pos;		//	位置
+	Vec2	m_v;			//	速度
+#else
 	int	m_x;		//	位置
 	int	m_y;
 	int	m_dx;	//	速度
 	int	m_dy;
+#endif
 	int	m_lane;		//	一番外側が0
 	bool	m_laneChanged;		//	レーンチェンジした直後かどうか
 };
@@ -104,7 +133,7 @@ void add_enemy()
 	if( g_nEnemy == 1 ) return;
 	g_enemy.push_back(Car(MAP_WD / 2 + 1, MAP_HT - 2, -1, 0));
 	if( g_nEnemy == 2 ) return;
-	g_enemy.push_back(Car(9, MAP_HT / 2 + 1, -1, 0, /*lane:*/4));
+	g_enemy.push_back(Car(9, MAP_HT / 2 + 1, 0, -1, /*lane:*/4));
 }
 void init()
 {
@@ -160,7 +189,7 @@ int draw_map()
 }
 void draw_car()
 {
-	g_db.setCursorPos(g_car.m_x*2, g_car.m_y);
+	g_db.setCursorPos(g_car.m_pos.first*2, g_car.m_pos.second);
 	g_db.setColor(DblBuffer::GREEN, DblBuffer::BLACK);
 	g_db.write("＠");
 }
@@ -168,7 +197,7 @@ void draw_enemy()
 {
 	g_db.setColor(DblBuffer::RED, DblBuffer::BLACK);
 	for (int i = 0; i < (int)g_enemy.size(); ++i) {
-		g_db.setCursorPos(g_enemy[i].m_x*2, g_enemy[i].m_y);
+		g_db.setCursorPos(g_enemy[i].m_pos.first*2, g_enemy[i].m_pos.second);
 		g_db.write("◆");
 	}
 }
@@ -193,17 +222,9 @@ void draw_score()
 	g_db.setCursorPos(SCORE_X, SCORE_Y + 1);
 	g_db.write(str);
 }
-//	x' 	(cosθ - sinθ)
-//	y'	(sinθ + cosθ)
-Vec2 rot_right90(const Vec2 v)
-{
-	return Vec2(-v.second, v.first);
-}
-Vec2 rot_left90(const Vec2 v)
-{
-	return Vec2(v.second, -v.first);
-}
 #if	0
+//	x' 	(cosθ - sinθ)  x
+//	y'	(sinθ + cosθ) y
 void rot_right90(int &x, int &y)
 {
 	//	c90 = 0, s90 = 1
@@ -226,8 +247,29 @@ bool can_move_to(int x, int y)
 {
 	return g_map[y][x] == ' ' || g_map[y][x] == '.';
 }
+bool can_move_to(const Vec2 &pos)
+{
+	const int x = pos.first;
+	const int y = pos.second;
+	return g_map[y][x] == ' ' || g_map[y][x] == '.';
+}
 void move_car(Car &car)
 {
+#if	1
+	Vec2 p = car.m_pos + car.m_v;		//	次の位置
+	if( !can_move_to(p) ) {		//	壁にぶつかった場合
+		Vec2 v = rot_right90(car.m_v);	//	速度ベクターを90度回転
+		p = car.m_pos + v;
+		if( can_move_to(p) )
+			car.m_v = v;
+		else {
+			//	行き止まりは無いと仮定
+			car.m_v = rot_left90(car.m_v);	//	速度ベクターを90度回転
+			p = car.m_pos + car.m_v;
+		}
+	}
+	car.m_pos = p;
+#else
 	int x = car.m_x + car.m_dx;
 	int y = car.m_y + car.m_dy;
 	if( !can_move_to(x, y) ) {
@@ -249,9 +291,46 @@ void move_car(Car &car)
 	}
 	car.m_x = x;
 	car.m_y = y;
+#endif
 }
 void change_lane(Car &car, int &key)
 {
+#if	1
+	Vec2 p = car.m_pos;
+	if( can_move_to(p) && can_move_to(p + car.m_v) )
+	{		//	行き止まりでない場合
+		if( car.m_v.second == 0 ) {		//	水平方向に移動している場合
+			if( key == VK_UP && can_move_to(p - Vec2(0, 1)) ) {
+				if( (p.second -= 2) < MAP_HT/2 )
+					--car.m_lane;		//	外側のレーンに移動
+				else
+					++car.m_lane;
+				key = 0;
+			} else if( key == VK_DOWN && can_move_to(p + Vec2(0, 1)) ) {
+				if( (p.second += 2) > MAP_HT/2 )
+					--car.m_lane;		//	外側のレーンに移動
+				else
+					++car.m_lane;
+				key = 0;
+			}
+		} else {			//	垂直方向に移動している場合
+			if( key == VK_LEFT && can_move_to(p - Vec2(1, 0)) ) {
+				if( (p.first -= 2) < MAP_WD/2 )
+					--car.m_lane;		//	外側のレーンに移動
+				else
+					++car.m_lane;
+				key = 0;
+			} else if( key == VK_RIGHT && can_move_to(p + Vec2(1, 0)) ) {
+				if( (p.first += 2) > MAP_WD/2 )
+					--car.m_lane;		//	外側のレーンに移動
+				else
+					++car.m_lane;
+				key = 0;
+			}
+		}
+	}
+	car.m_pos = p;
+#else
 	int x = car.m_x;
 	int y = car.m_y;
 	if( can_move_to(x, y) && can_move_to(x+car.m_dx, y+car.m_dy) )
@@ -292,7 +371,9 @@ void change_lane(Car &car, int &key)
 	}
 	car.m_x = x;
 	car.m_y = y;
+#endif
 }
+#if	0
 void move_car(Car &car, int &key)
 {
 	int x = car.m_x + car.m_dx;
@@ -352,10 +433,55 @@ void move_car(Car &car, int &key)
 	car.m_x = x;
 	car.m_y = y;
 }
+#endif
 //	敵機を自機の方にレーン変更
 //		一番外側が レーン０，一番内側が レーン４
 void change_lane(Car &car)
 {
+#if	1
+	if( car.m_laneChanged ||		//	２回連続レーンチェンジ不可
+		car.m_lane == g_car.m_lane ||
+		!can_move_to(car.m_pos + car.m_v) )		//	行き止まりの場合
+	{
+		car.m_laneChanged = false;
+		return;
+	}
+	if( car.m_lane > g_car.m_lane ) {		//	外側のレーンに移動
+		if( car.m_v.second == 0 ) {		//	水平方向に移動している場合
+			if( car.m_pos.second < MAP_HT/2 ) {
+				if( can_move_to(car.m_pos - Vec2(0, 1)) ) {
+					car.m_pos.second -= 2;
+					--car.m_lane;
+					car.m_laneChanged = true;
+				}
+			} else {
+				if( can_move_to(car.m_pos + Vec2(0, 1)) ) {
+					car.m_pos.second += 2;
+					--car.m_lane;
+					car.m_laneChanged = true;
+				}
+			}
+		} else {
+		}
+	} else {		//	内側のレーンに移動
+		if( car.m_v.second == 0 ) {		//	水平方向に移動している場合
+			if( car.m_pos.second < MAP_HT/2 ) {
+				if( can_move_to(car.m_pos + Vec2(0, 1)) ) {
+					car.m_pos.second += 2;
+					++car.m_lane;
+					car.m_laneChanged = true;
+				}
+			} else {
+				if( can_move_to(car.m_pos - Vec2(0, 1)) ) {
+					car.m_pos.second -= 2;
+					++car.m_lane;
+					car.m_laneChanged = true;
+				}
+			}
+		} else {
+		}
+	}
+#else
 	if( car.m_laneChanged ||		//	２回連続レーンチェンジ不可
 		car.m_lane == g_car.m_lane ||
 		!can_move_to(car.m_x + car.m_dx, car.m_y + car.m_dy) )		//	行き止まりの場合
@@ -398,11 +524,47 @@ void change_lane(Car &car)
 		} else {
 		}
 	}
+#endif
 	assert(car.m_lane >= 0 && car.m_lane < 5);
 }
 //	加減速処理
 void accel_decel(int &key, int &iv)
 {
+#if	1
+    if( g_car.m_v.first > 0 ) {
+    	if( key == VK_RIGHT ) {
+    		iv = 5;
+    		key = 0;
+    	} else if( key == VK_LEFT ) {
+    		iv = 20;
+    		key = 0;
+    	}
+    } else if( g_car.m_v.first < 0 ) {
+    	if( key == VK_RIGHT ) {
+    		iv = 20;
+    		key = 0;
+    	} else if( key == VK_LEFT ) {
+    		iv = 5;
+    		key = 0;
+    	}
+    } else if( g_car.m_v.second > 0 ) {
+    	if( key == VK_DOWN ) {
+    		iv = 5;
+    		key = 0;
+    	} else if( key == VK_UP ) {
+    		iv = 20;
+    		key = 0;
+    	}
+    } else if( g_car.m_v.second < 0 ) {
+    	if( key == VK_DOWN ) {
+    		iv = 20;
+    		key = 0;
+    	} else if( key == VK_UP ) {
+    		iv = 5;
+    		key = 0;
+    	}
+    }
+#else
     if( g_car.m_dx > 0 ) {
     	if( key == VK_RIGHT ) {
     		iv = 5;
@@ -436,11 +598,12 @@ void accel_decel(int &key, int &iv)
     		key = 0;
     	}
     }
+#endif
 }
 void eat_dot()
 {
-	if( g_map[g_car.m_y][g_car.m_x] == '.' ) {
-		g_map[g_car.m_y][g_car.m_x] = ' ';
+	if( g_map[g_car.m_pos.second][g_car.m_pos.first] == '.' ) {
+		g_map[g_car.m_pos.second][g_car.m_pos.first] = ' ';
 		g_score += 10;
 		mciSendString(TEXT("play button57.mp3"), NULL, 0, NULL);
 		//std::cout << (char)0x07;			//	ビープ音
@@ -450,10 +613,17 @@ bool check_crash()
 {
 	for (int i = 0; i < (int)g_enemy.size(); ++i) {
 		const Car &c = g_enemy[i];
+#if	1
+		if( c.m_pos == g_car.m_pos )
+			return true;
+		if( c.m_pos == g_car.m_pos - g_car.m_v )
+			return true;		//	すり抜けた場合
+#else
 		if( c.m_x == g_car.m_x && c.m_y == g_car.m_y )
 			return true;
 		if( c.m_x == g_car.m_x - g_car.m_dx && c.m_y == g_car.m_y - g_car.m_dy)
 			return true;		//	すり抜けた場合
+#endif
 	}
 	return false;
 }
