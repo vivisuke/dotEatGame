@@ -222,26 +222,6 @@ void draw_score()
 	g_db.setCursorPos(SCORE_X, SCORE_Y + 1);
 	g_db.write(str);
 }
-#if	0
-//	x' 	(cosθ - sinθ)  x
-//	y'	(sinθ + cosθ) y
-void rot_right90(int &x, int &y)
-{
-	//	c90 = 0, s90 = 1
-	int x2 = -y;
-	int y2 = x;
-	x = x2;
-	y = y2;
-}
-void rot_left90(int &x, int &y)
-{
-	//	c(-90) = 0, s(-90) = -1
-	int x2 = y;
-	int y2 = -x;
-	x = x2;
-	y = y2;
-}
-#endif
 //	指定位置に壁が無いかどうかをチェック
 bool can_move_to(int x, int y)
 {
@@ -255,7 +235,6 @@ bool can_move_to(const Vec2 &pos)
 }
 void move_car(Car &car)
 {
-#if	1
 	Vec2 p = car.m_pos + car.m_v;		//	次の位置
 	if( !can_move_to(p) ) {		//	壁にぶつかった場合
 		Vec2 v = rot_right90(car.m_v);	//	速度ベクターを90度回転
@@ -269,33 +248,9 @@ void move_car(Car &car)
 		}
 	}
 	car.m_pos = p;
-#else
-	int x = car.m_x + car.m_dx;
-	int y = car.m_y + car.m_dy;
-	if( !can_move_to(x, y) ) {
-		if( car.m_dy == 0 ) {		//	水平方向に移動している場合
-			if( can_move_to(car.m_x, car.m_y + 1) )
-				car.m_dy = 1;
-			else
-				car.m_dy = -1;
-			car.m_dx = 0;
-		} else {			//	垂直方向に移動している場合
-			if( can_move_to(car.m_x + 1, car.m_y) )
-				car.m_dx = 1;
-			else
-				car.m_dx = -1;
-			car.m_dy = 0;
-		}
-		x = car.m_x + car.m_dx;
-		y = car.m_y + car.m_dy;
-	}
-	car.m_x = x;
-	car.m_y = y;
-#endif
 }
 void change_lane(Car &car, int &key)
 {
-#if	1
 	Vec2 p = car.m_pos;
 	if( can_move_to(p) && can_move_to(p + car.m_v) )
 	{		//	行き止まりでない場合
@@ -330,115 +285,11 @@ void change_lane(Car &car, int &key)
 		}
 	}
 	car.m_pos = p;
-#else
-	int x = car.m_x;
-	int y = car.m_y;
-	if( can_move_to(x, y) && can_move_to(x+car.m_dx, y+car.m_dy) )
-	{		//	行き止まりでない場合
-		if( car.m_dy == 0 ) {		//	水平方向に移動している場合
-			if( key == VK_UP && can_move_to(x, y-1)) {
-				y-=2;
-				if( y < MAP_HT/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			} else if( key == VK_DOWN && can_move_to(x, y+1)) {
-				y+=2;
-				if( y > MAP_HT/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			}
-		} else {			//	垂直方向に移動している場合
-			if( key == VK_LEFT && can_move_to(x-1, y)) {
-				x-=2;
-				if( x < MAP_WD/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			} else if( key == VK_RIGHT && can_move_to(x+1, y)) {
-				x+=2;
-				if( x > MAP_WD/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			}
-		}
-	}
-	car.m_x = x;
-	car.m_y = y;
-#endif
 }
-#if	0
-void move_car(Car &car, int &key)
-{
-	int x = car.m_x + car.m_dx;
-	int y = car.m_y + car.m_dy;
-	if( !can_move_to(x, y) ) {
-		if( car.m_dy == 0 ) {		//	水平方向に移動している場合
-			if( can_move_to(car.m_x, car.m_y + 1) )
-				car.m_dy = 1;
-			else
-				car.m_dy = -1;
-			car.m_dx = 0;
-		} else {			//	垂直方向に移動している場合
-			if( can_move_to(car.m_x + 1, car.m_y) )
-				car.m_dx = 1;
-			else
-				car.m_dx = -1;
-			car.m_dy = 0;
-		}
-		x = car.m_x + car.m_dx;
-		y = car.m_y + car.m_dy;
-	} else if( can_move_to(x, y) && can_move_to(x+car.m_dx, y+car.m_dy) )
-	{		//	行き止まりでない場合
-		if( car.m_dy == 0 ) {		//	水平方向に移動している場合
-			if( key == VK_UP && can_move_to(x, y-1)) {
-				y-=2;
-				if( y < MAP_HT/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			} else if( key == VK_DOWN && can_move_to(x, y+1)) {
-				y+=2;
-				if( y > MAP_HT/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			}
-		} else {			//	垂直方向に移動している場合
-			if( key == VK_LEFT && can_move_to(x-1, y)) {
-				x-=2;
-				if( x < MAP_WD/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			} else if( key == VK_RIGHT && can_move_to(x+1, y)) {
-				x+=2;
-				if( x > MAP_WD/2 )
-					--car.m_lane;		//	外側のレーンに移動
-				else
-					++car.m_lane;
-				key = 0;
-			}
-		}
-	}
-	car.m_x = x;
-	car.m_y = y;
-}
-#endif
 //	敵機を自機の方にレーン変更
 //		一番外側が レーン０，一番内側が レーン４
 void change_lane(Car &car)
 {
-#if	1
 	if( car.m_laneChanged ||		//	２回連続レーンチェンジ不可
 		car.m_lane == g_car.m_lane ||
 		!can_move_to(car.m_pos + car.m_v) )		//	行き止まりの場合
@@ -481,56 +332,11 @@ void change_lane(Car &car)
 		} else {
 		}
 	}
-#else
-	if( car.m_laneChanged ||		//	２回連続レーンチェンジ不可
-		car.m_lane == g_car.m_lane ||
-		!can_move_to(car.m_x + car.m_dx, car.m_y + car.m_dy) )		//	行き止まりの場合
-	{
-		car.m_laneChanged = false;
-		return;
-	}
-	if( car.m_lane > g_car.m_lane ) {		//	外側のレーンに移動
-		if( car.m_dy == 0 ) {		//	水平方向に移動している場合
-			if( car.m_y < MAP_HT/2 ) {
-				if( can_move_to(car.m_x, car.m_y-1) ) {
-					car.m_y -= 2;
-					--car.m_lane;
-					car.m_laneChanged = true;
-				}
-			} else {
-				if( can_move_to(car.m_x, car.m_y+1) ) {
-					car.m_y += 2;
-					--car.m_lane;
-					car.m_laneChanged = true;
-				}
-			}
-		} else {
-		}
-	} else {		//	内側のレーンに移動
-		if( car.m_dy == 0 ) {		//	水平方向に移動している場合
-			if( car.m_y < MAP_HT/2 ) {
-				if( can_move_to(car.m_x, car.m_y+1) ) {
-					car.m_y += 2;
-					++car.m_lane;
-					car.m_laneChanged = true;
-				}
-			} else {
-				if( can_move_to(car.m_x, car.m_y-1) ) {
-					car.m_y -= 2;
-					++car.m_lane;
-					car.m_laneChanged = true;
-				}
-			}
-		} else {
-		}
-	}
-#endif
 	assert(car.m_lane >= 0 && car.m_lane < 5);
 }
 //	加減速処理
 void accel_decel(int &key, int &iv)
 {
-#if	1
     if( g_car.m_v.first > 0 ) {
     	if( key == VK_RIGHT ) {
     		iv = 5;
@@ -564,41 +370,6 @@ void accel_decel(int &key, int &iv)
     		key = 0;
     	}
     }
-#else
-    if( g_car.m_dx > 0 ) {
-    	if( key == VK_RIGHT ) {
-    		iv = 5;
-    		key = 0;
-    	} else if( key == VK_LEFT ) {
-    		iv = 20;
-    		key = 0;
-    	}
-    } else if( g_car.m_dx < 0 ) {
-    	if( key == VK_RIGHT ) {
-    		iv = 20;
-    		key = 0;
-    	} else if( key == VK_LEFT ) {
-    		iv = 5;
-    		key = 0;
-    	}
-    } else if( g_car.m_dy > 0 ) {
-    	if( key == VK_DOWN ) {
-    		iv = 5;
-    		key = 0;
-    	} else if( key == VK_UP ) {
-    		iv = 20;
-    		key = 0;
-    	}
-    } else if( g_car.m_dy < 0 ) {
-    	if( key == VK_DOWN ) {
-    		iv = 20;
-    		key = 0;
-    	} else if( key == VK_UP ) {
-    		iv = 5;
-    		key = 0;
-    	}
-    }
-#endif
 }
 void eat_dot()
 {
@@ -613,17 +384,10 @@ bool check_crash()
 {
 	for (int i = 0; i < (int)g_enemy.size(); ++i) {
 		const Car &c = g_enemy[i];
-#if	1
 		if( c.m_pos == g_car.m_pos )
 			return true;
 		if( c.m_pos == g_car.m_pos - g_car.m_v )
 			return true;		//	すり抜けた場合
-#else
-		if( c.m_x == g_car.m_x && c.m_y == g_car.m_y )
-			return true;
-		if( c.m_x == g_car.m_x - g_car.m_dx && c.m_y == g_car.m_y - g_car.m_dy)
-			return true;		//	すり抜けた場合
-#endif
 	}
 	return false;
 }
