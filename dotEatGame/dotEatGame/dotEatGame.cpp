@@ -53,24 +53,12 @@ struct Car
 public:
 	Car(int x = 0, int y = 0, int dx = 0, int dy = 0, int lane = 0)
 		: m_pos(x, y), m_v(dx, dy)
-		//: m_x(x), m_y(y), m_dx(dx), m_dy(dy)
 		, m_lane(lane)
 		, m_laneChanged(false)
 		{}
-	//Car(const Car &x)
-	//	: m_x(x.m_x), m_y(x.m_y), m_dx(x.m_dx), m_dy(x.m_dy), m_lane(x.m_lane)
-	//	, m_laneChanged(false)
-	//	{}
 public:
-#if	1
 	Vec2	m_pos;		//	位置
 	Vec2	m_v;			//	速度
-#else
-	int	m_x;		//	位置
-	int	m_y;
-	int	m_dx;	//	速度
-	int	m_dy;
-#endif
 	int	m_lane;		//	一番外側が0
 	bool	m_laneChanged;		//	レーンチェンジした直後かどうか
 };
@@ -86,6 +74,7 @@ public:
 
 int	g_score;	//	スコア
 Car	g_car;		//	自機
+int	g_level;
 int	g_nEnemy;	//	敵機数
 std::vector<Car>	g_enemy;		//	敵機
 char	g_map[MAP_HT][MAP_WD];	//	マップ
@@ -258,8 +247,9 @@ void change_lane(Car &car, int &key)
 			if( key == VK_UP && can_move_to(p - Vec2(0, 1)) ) {
 				if( (p.second -= 2) < MAP_HT/2 )
 					--car.m_lane;		//	外側のレーンに移動
-				else
+				else {
 					++car.m_lane;
+				}
 				key = 0;
 			} else if( key == VK_DOWN && can_move_to(p + Vec2(0, 1)) ) {
 				if( (p.second += 2) > MAP_HT/2 )
@@ -306,6 +296,7 @@ void change_lane(Car &car)
 					car.m_laneChanged = true;
 				}
 			} else {
+				if( !g_level ) return;
 				if( can_move_to(car.m_pos + Vec2(0, 1)) ) {
 					car.m_pos.second += 2;
 					--car.m_lane;
@@ -323,6 +314,7 @@ void change_lane(Car &car)
 					car.m_laneChanged = true;
 				}
 			} else {
+				if( !g_level ) return;
 				if( can_move_to(car.m_pos - Vec2(0, 1)) ) {
 					car.m_pos.second -= 2;
 					++car.m_lane;
@@ -394,6 +386,7 @@ bool check_crash()
 bool game()
 {
 	g_score = 0;
+	g_level = 0;
 	g_nEnemy = 1;
 	init();
 	int key = 0;   // 押下されたキー
@@ -411,7 +404,8 @@ bool game()
 				mciSendString(TEXT("play one23.mp3"), NULL, 0, NULL);
 				Sleep(1000);
 				g_score += g_nEnemy * 1000;
-				++g_nEnemy;
+				if( ++g_level > 1 )
+					++g_nEnemy;
 				init();
 				continue;
 				//return true;
@@ -458,6 +452,7 @@ bool game()
 #if	0
 int main()
 {
+	g_level = 0;
 	g_nEnemy = 1;	//	敵機数：1
 	init();
 	draw_map();
